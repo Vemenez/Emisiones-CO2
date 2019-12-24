@@ -1,0 +1,235 @@
+---
+title: "Emisiones de CO2 y el Cambio Climático"
+author: "Gimenez, Ventura & Navarro, Iván"
+date: "20/12/2019"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, eval = TRUE, message = FALSE, warning  = FALSE)
+```
+
+```{r one}
+library(tidyverse)
+library(rio)
+library(ggplot2)
+library(dplyr)
+library(ggThemeAssist)
+library(tidyquant)
+library(dygraphs)
+library(rworldmap)
+library(maps)
+library(ggmap)
+library(rnaturalearth)
+library(viridis)
+library(hrbrthemes)
+library(png)
+
+df <- rio::import("./datos/global.1751_2014v2.csv")
+df2 <- rio::import("./datos/nation.1751_2014v2.csv")
+df4 <- rio::import("./datos/co_emissions_per_capita.csv")
+df5 <- rio::import("./datos/greenhouse-gas-emissions-by-sector.csv")
+df6 <- rio::import("./datos/annual-co-emissions-by-region.csv")
+```
+
+
+## Introducción
+
+Nuestro trabajo tiene como finalidad arrojar algo más de información sobre las emisiones de CO2.
+
+```{r eval = TRUE, echo = FALSE,fig.align='center'}
+knitr::include_graphics(here::here("./datos/Greta.png")  )
+```
+
+Las emisiones de gases de efecto invernadero puede estar detrás de la causa del incremento de temperatura de nuestro planeta.
+
+---
+
+## ¿De dónde hemos obtenido los datos?
+Los datos los hemos obtenido de dos fuentes diferentes.
+
+<https://cdiac.ess-dive.lbl.gov>
+
+```{r eval = TRUE, echo = FALSE,out.width =" 60% "}
+knitr::include_graphics(here::here("./datos/CDIAC.png")  )
+```
+
+<https://ourworldindata.org/>
+
+```{r eval = TRUE, echo = FALSE,out.width =" 40% "}
+knitr::include_graphics(here::here("./datos/OWID.png")  )
+
+```
+
+
+
+# Emisiones Totales de CO2 en el mundo y Europa. 
+
+---
+
+```{r two,fig.align='center',out.width =" 110% "}
+list_of_values2 <- c("EU-28","Europe (other)","United States","Africa","Middle East","India","China","Asia and Pacific (other)")
+Global <- filter(df6,`Entity` %in% list_of_values2) %>% filter(`Year`>1850)
+
+Global <- select(Global,1,3:4)
+
+names(Global) <- c("Region","Anyo","Emisiones")
+
+ggplot(Global,aes(x = Anyo, y = Emisiones/1000000,fill=Region))  + geom_line(color="dark") + theme_minimal()+ geom_area(alpha=0.6 , size=.5, colour = "white") + scale_fill_viridis(discrete = T) + theme_ipsum() + ggtitle("Emisiones Totales (millones de toneladas)")
+
+```
+
+
+---
+
+
+```{r three,fig.align='center',out.width =" 100% "}
+list_of_values3 <- c("Germany","Spain","Italy","United Kingdom","France","Netherlands")
+Paises <- filter(df6,`Entity` %in% list_of_values3)
+
+Paises <- select(Paises,1,3:4)
+
+names(Paises) <- c("Region","Anyo","Emisiones")
+
+ggplot(Paises) + geom_line(aes(Anyo, Emisiones, color = Region)) + facet_wrap(vars(Region), nrow = 2, ncol = 3 )
+```
+
+# Emisiones de CO2 en España por sectores y tipo.
+
+---
+
+```{r four}
+los4 <- df5 %>% filter (Entity == "Spain") %>% filter(Year>1989) %>% filter(Year<2011) %>% select(-c(1:2,10:11))
+names(los4) <- c("Año","Otros","Basura","Industria","Hogares y Comercios","Transporte","Agricultura","Energia")
+
+dygraph(los4,main = "Emisiones CO2 por Sectores de actividad") %>% dyOptions(stackedGraph = TRUE) %>%
+  dyRangeSelector() %>% dyLegend(width = 400, show="follow")
+```
+
+
+---
+
+```{r five,out.width =" 100% "}
+
+df2 <- df2[-c(1, 2), ]
+
+df3 <- df2 
+
+names(df3) <- c("Nation","Year","Total CO2 Emissions","Solid fuel","Liquid fuel","Gas fuel","Cement production","Gas flaring","Per Capita CO2","Bunker fuels")
+
+names(df) <- c("Year","Total CO2 Emissions","Gas fuel","Liquid fuel","Solid fuel","Cement production","Gas flaring","Per Capita CO2")
+
+espana <- df3 %>% filter(Nation == "SPAIN")
+
+espana <- select(espana,-c(`Gas flaring`,`Bunker fuels`,`Per Capita CO2`))
+
+espana <- select(espana,-c(Nation))
+
+espana <- gather(espana,TipoEmi,CantCO2,2:6)
+
+Emis_ends <- espana %>% group_by(`TipoEmi`) %>% top_n(1, Year) %>% pull(`CantCO2`)
+
+espana %>% ggplot(aes(x = Year, y = CantCO2, color=TipoEmi)) + geom_line(size=1)  +
+labs(title = "Emisiones de CO2 en España" ,  caption = "En miles de toneladas" , x = "Año" , y = "Emisiones") + scale_y_continuous(sec.axis = sec_axis(~ ., breaks = Emis_ends)) +   #- sec_axis() especifica un eje secundario
+     scale_x_continuous(expand = c(0, 0))
+```
+
+# Emisiones totales a nivel mundial(2014).
+
+---
+
+```{r six}
+CO2mundial <- df %>% filter(Year == 2014)
+
+CO2mundial <- select(CO2mundial,-c(8))
+
+CO2mundial <- gather(CO2mundial,TipoEmi,CantCo2,2:7)
+
+ggplot(CO2mundial,aes(TipoEmi,CantCo2, fill=TipoEmi)) + geom_bar(stat = "identity") + coord_flip() + theme_minimal() + theme(legend.position="none") + labs(title = "EMISIONES DE CO2 EN 2014 A NIVEL GLOBAL" ,  caption = "En millones de toneladas" , x = "Tipo de Emisión" , y = "Cantidad de CO2")
+
+```
+
+
+---
+
+```{r seven}
+mundialtop <- df3 %>% filter(Year==2014)
+
+mundialtop <- select(mundialtop, 1,3)
+
+mundialtop <- mundialtop %>% arrange(desc(`Total CO2 Emissions`))
+
+mundialtop <- mundialtop[c(1:10,25),]
+
+mundialtop <- gather(mundialtop,Emision_total, CantidadCO2, 2)
+
+ggplot(mundialtop,aes(reorder(Nation,CantidadCO2), CantidadCO2/1000,fill=Nation)) + geom_bar(stat = "identity") + theme_minimal() + theme(legend.position="none")+coord_flip() + labs(title = "TOP EMISIONES A NIVEL GLOBAL EN 2014" ,  caption = "En millones de toneladas" , x = "PAIS" , y = "CANTIDAD DE CO2")
+```
+
+# Evolución de los principales países.
+
+---
+
+```{r eight}
+mundialevol <- df3
+
+mundialevol <- select(mundialevol,1:3)
+
+list_of_values2 <- c("CHINA","UNITED STATES OF AMERICA","INDIA","RUSSIAN FEDERATION","JAPAN","SPAIN","USSR")
+mundialevol <- filter(mundialevol,`Nation` %in% list_of_values2)
+mundialevol <- mundialevol %>% filter(`Year`> 1900) %>% group_by(Nation)
+
+mundialevol <- spread(mundialevol,`Nation`,`Total CO2 Emissions`)
+
+dygraph(mundialevol,main = "Emisiones totales del Top") %>%
+  dyOptions(labelsUTC = TRUE, fillGraph=TRUE, fillAlpha=0.1, drawGrid = FALSE)%>%
+  dyRangeSelector() %>%
+  dyCrosshair(direction = "vertical") %>%
+  dyHighlight(highlightCircleSize = 5, highlightSeriesBackgroundAlpha = 3, hideOnMouseOut = FALSE)  %>%
+  dyRoller(rollPeriod = 1) %>% dyLegend(width = 500,show = "follow")
+
+```
+
+
+---
+
+```{r nine, warning=FALSE,out.width =" 100% "}
+mundialpc <- df3 %>% filter(Year==2014)
+mundialpc$"Per Capita CO2" <- as.numeric(as.character(mundialpc$"Per Capita CO2"))
+
+
+mundialpc <- mundialpc %>% arrange(desc(`Per Capita CO2`))
+
+mundialpc <- mundialpc[c(1:10,77),]
+mundialpc <- select(mundialpc, 1,2,9)
+
+mundialpc <- gather(mundialpc,EmisionPC,CantidadPC,3)
+
+mundialpc <- select(mundialpc,1,3,4)
+
+ggplot(mundialpc,aes(reorder(Nation,CantidadPC), CantidadPC,fill=Nation)) + geom_bar(stat = "identity") + theme_minimal() + theme(legend.position="none")+coord_flip() + labs(title = "EMISIONES DE CO2 PC EN 2014 A NIVEL GLOBAL" ,  caption = "En toneladas métricas" , x = "Cantidad CO2 PC" , y = "TOP PAISES")
+```
+
+# Emisiones mundiales totales y PC a nivel mundial(2014)
+
+---
+
+```{r ten,out.width =" 100% "}
+
+img1_path <- "datos/EmisionesPC.png"
+img1 <- readPNG(img1_path, native = TRUE, info = TRUE)
+knitr::include_graphics(img1_path)
+
+
+```
+
+---
+
+```{r eleven,out.width =" 100% "}
+
+img2_path <- "datos/Emisionestot.png"
+img2 <- readPNG(img2_path, native = TRUE, info = TRUE)
+knitr::include_graphics(img2_path)
+
+```
+
